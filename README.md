@@ -69,12 +69,11 @@ You paste your JD, upload your resume, pick your round, and Alex (your AI interv
 
 **Union Squared** — Google NYC Hackathon 2026
 
-| Name | Role |
+Team
 |---|---|
-| Kavya Sri Yakkala | Frontend & UI |
-| Narayani Sai Pemmaraju | Backend & Cloud Infrastructure |
-| Sanjana Mohan | Scraper & Agent Architecture |
-
+| Kavya Sri Yakkala |
+| Narayani Sai Pemmaraju | 
+| Sanjana Mohan |
 ---
 
 ## Run Locally
