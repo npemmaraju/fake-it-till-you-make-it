@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+node_modules/
+.next/
+application_default_credentials.json
+*.json.bak
