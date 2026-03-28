@@ -70,7 +70,6 @@ You paste your JD, upload your resume, pick your round, and Alex (your AI interv
 **Union Squared** — Google NYC Hackathon 2026
 
 Team
-|---|---|
 | Kavya Sri Yakkala |
 | Narayani Sai Pemmaraju | 
 | Sanjana Mohan |
