@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrepAI — Interview Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Barlow:wght@300;400;500;600;700;800&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/setup.css">
+<link rel="stylesheet" href="styles/lobby.css">
+<link rel="stylesheet" href="styles/interview.css">
+<link rel="stylesheet" href="styles/feedback.css">
+</head>
+<body>
+
+<!-- ═══ LOADING OVERLAY ═══ -->
+<div id="overlay">
+  <div class="ov-spinner"></div>
+  <div class="ov-title" id="ov-title">Initializing...</div>
+  <div class="ov-steps" id="ov-steps"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Self-view tile (floats over interview screen) -->
+<div id="self-tile">
+  <video id="self-video" autoplay muted playsinline></video>
+  <div class="self-tile-bar">
+    <span class="self-tile-label">YOU</span>
+    <button class="self-tile-close" onclick="hideSelfTile()">✕</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN 1 — SETUP
+═══════════════════════════════════════ -->
+<div class="screen active" id="s-setup">
+  <div style="width:100%;display:flex;flex-direction:column;align-items:center;">
+
+    <div class="topbar">
+      <div class="logo">
+        <div class="logo-glyph"></div>
+        <div class="logo-name">Prep<em>AI</em></div>
+      </div>
+      <div class="sys-tag">
+        <span class="status-dot"></span>
+        SYSTEM ONLINE · Powered by Gemini
+      </div>
+    </div>
+
+    <div class="setup-grid">
+      <div style="display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Main config panel -->
+        <div class="panel">
+          <div class="panel-label">Session Configuration</div>
+          <div class="panel-title">Set up your<br>interview session</div>
+          <div class="panel-sub">Paste the JD, upload your resume, pick your round. We'll research the company and tailor every question.</div>
+
+          <!-- API Key -->
+          <div class="field">
+            <div class="field-lbl">Gemini API Key <span>from aistudio.google.com — free tier works</span></div>
+            <div class="apikey-row">
+              <span class="apikey-icon">🔑</span>
+              <input class="apikey-input" type="password" id="api-key" placeholder="AIza..." oninput="onApiKeyChange(this)">
+              <span class="apikey-status" id="api-key-status">not set</span>
+            </div>
+          </div>
+
+          <!-- Job Description -->
+          <div class="field">
+            <div class="field-lbl">Job Description <span>paste from company site — the more detail the better</span></div>
+            <textarea class="field-input" id="jd-text" rows="7"
+              placeholder="Paste the full job description here...
+
+We are looking for a Software Engineer to join our Platform team. You will be responsible for designing and building scalable backend systems, driving technical decisions..."></textarea>
+          </div>
+
+          <!-- Resume -->
+          <div class="field">
+            <div class="field-lbl">Resume / CV <span>TXT or DOCX (paste text for best results with PDF)</span></div>
+            <div class="file-drop" id="resume-drop">
+              <input type="file" accept=".pdf,.docx,.txt,.doc" id="resume-file" onchange="handleResumeUpload(this)">
+              <div class="file-drop-icon" id="resume-icon">[ FILE ]</div>
+              <div class="file-drop-text" id="resume-text">Click to upload or drag & drop your resume</div>
+            </div>
+          </div>
+
+          <!-- Company + Role -->
+          <div class="tworow">
+            <div class="field" style="margin-bottom:0">
+              <div class="field-lbl">Company</div>
+              <input class="field-input" type="text" id="company" placeholder="e.g. Google, Stripe, Airbnb">
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <div class="field-lbl">Job Title</div>
+              <input class="field-input" type="text" id="jobtitle" placeholder="e.g. SWE Intern, PM, Data Scientist">
+            </div>
+          </div>
+        </div>
+
+        <!-- Round selector — HR and Resume only (no coding) -->
+        <div class="panel">
+          <div class="panel-label">Interview Round</div>
+          <div class="panel-sub" style="margin-bottom:16px">Each round uses different questioning strategies and evaluation criteria.</div>
+          <div class="round-tabs">
+            <div class="rtab active" data-round="hr" onclick="pickRound(this)">
+              <div class="rtab-tag">Round 01</div>
+              <div class="rtab-name">HR Round</div>
+              <div class="rtab-desc">Culture fit, behavioral questions, motivation, and STAR probing. Starts with "tell me about yourself."</div>
+            </div>
+            <div class="rtab" data-round="resume" onclick="pickRound(this)">
+              <div class="rtab-tag">Round 02</div>
+              <div class="rtab-name">Resume Grilling</div>
+              <div class="rtab-desc">Deep dive on every project and claim. Your resume will be challenged line by line with specifics.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode selector -->
+        <div class="panel">
+          <div class="panel-label">Session Mode</div>
+          <div class="mode-grid">
+            <div class="mcard active" data-mode="learning" onclick="pickMode(this)">
+              <div class="mcard-name">⟡ Learning Mode</div>
+              <div class="mcard-desc">Instant feedback after each answer. See exactly what worked and what didn't in real time.</div>
+            </div>
+            <div class="mcard" data-mode="real" onclick="pickMode(this)">
+              <div class="mcard-name">◈ Real Simulation</div>
+              <div class="mcard-desc">Full pressure, no feedback mid-session. Complete report generated at the end only.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: Live config sidebar -->
+      <div class="side-panel">
+        <div class="config-display">
+          <div class="panel-label">Live Config</div>
+          <div class="config-row"><div class="config-key">Company</div><div class="config-val" id="cfg-company">—</div></div>
+          <div class="config-row"><div class="config-key">Role</div><div class="config-val" id="cfg-role">—</div></div>
+          <div class="config-row"><div class="config-key">Round</div><div class="config-val" id="cfg-round">HR Round</div></div>
+          <div class="config-row"><div class="config-key">Mode</div><div class="config-val" id="cfg-mode">Learning</div></div>
+          <div class="config-row"><div class="config-key">JD</div><div class="config-val" id="cfg-jd">—</div></div>
+          <div class="config-row"><div class="config-key">Resume</div><div class="config-val" id="cfg-resume">—</div></div>
+          <div class="config-row"><div class="config-key">API Key</div><div class="config-val" id="cfg-apikey">—</div></div>
+        </div>
+
+        <button class="btn-launch" id="launch-btn" onclick="goToLobby()">
+          Launch Session →
+        </button>
+
+        <div class="hint-box">
+          <div class="panel-label" style="margin-bottom:12px">What This Does</div>
+          <ul class="hint-list">
+            <li>Researches ${company} interview patterns from Reddit, Glassdoor & engineering blogs via Gemini Search</li>
+            <li>Aligns questions to your actual resume claims — nothing generic</li>
+            <li>Interview starts like the real thing: "Tell me about yourself" → project deep dive → role-specific</li>
+            <li>Adapts questions based on what you say — weak answers get drilled, vague claims get challenged</li>
+            <li>Real-time body language analysis: eye contact, posture, confidence, gestures</li>
+            <li>Cheat detection: flags scripted delivery, AI-generated answers, and off-screen eye movement</li>
+            <li>Ruthless end report with per-question scoring and targeted improvement areas</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN 2 — LOBBY
+═══════════════════════════════════════ -->
+<div class="screen" id="s-lobby">
+  <div class="lobby-wrap">
+
+    <!-- Camera preview -->
+    <div class="lobby-preview">
+      <video id="lobby-video" autoplay muted playsinline></video>
+      <div class="lobby-video-off" id="lobby-off">
+        <div class="lobby-avatar-ring" id="lobby-initials">?</div>
+        <p>Camera is off</p>
+      </div>
+      <div class="mic-level-wrap" id="lobby-mic-bars">
+        <div class="mic-bar" style="height:4px" id="mb0"></div>
+        <div class="mic-bar" style="height:4px" id="mb1"></div>
+        <div class="mic-bar" style="height:4px" id="mb2"></div>
+        <div class="mic-bar" style="height:4px" id="mb3"></div>
+        <div class="mic-bar" style="height:4px" id="mb4"></div>
+      </div>
+      <div class="lobby-name-tag" id="lobby-name-tag">Candidate</div>
+      <div class="lobby-ctrl-row">
+        <button class="ctrl-btn" id="cam-btn" onclick="toggleCamera()" title="Toggle Camera">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.9L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+          </svg>
+        </button>
+        <button class="ctrl-btn" id="mic-btn" onclick="toggleMic()" title="Toggle Mic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+            <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Side info -->
+    <div class="lobby-side">
+      <div>
+        <div class="lobby-heading">Ready to<br>interview at<br><em id="lobby-company">PrepAI?</em></div>
+        <div class="lobby-meta" style="margin-top:12px">
+          <strong id="lobby-role-label">Role</strong><br>
+          <span id="lobby-round-label">Round</span> · <span id="lobby-mode-label">Mode</span>
+        </div>
+      </div>
+
+      <div class="device-row">
+        <div class="device-item">
+          <svg class="device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.9L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+          </svg>
+          <span class="device-label" id="cam-label">Camera — checking...</span>
+          <div class="device-status" id="cam-status-dot"></div>
+        </div>
+        <div class="device-item">
+          <svg class="device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+            <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+          </svg>
+          <span class="device-label" id="mic-label">Microphone — checking...</span>
+          <div class="device-status" id="mic-status-dot"></div>
+        </div>
+      </div>
+
+      <div class="video-q-box">
+        <div class="video-q-label">Show your video during the interview?</div>
+        <div class="video-q-options">
+          <div class="vq-opt sel" data-show="yes" onclick="pickVideoShow(this)">
+            <span class="vq-icon">📸</span>
+            Yes — show me
+          </div>
+          <div class="vq-opt" data-show="no" onclick="pickVideoShow(this)">
+            <span class="vq-icon">🙈</span>
+            Hide from me
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-join" onclick="joinInterview()">Start Interview →</button>
+      <button class="btn-back" onclick="goBack()">← Back to Setup</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN 3 — INTERVIEW
+═══════════════════════════════════════ -->
+<div class="screen" id="s-interview">
+
+  <!-- LEFT: Question sidebar -->
+  <div class="iv-side">
+    <div class="iv-side-top">
+      <div class="iv-logo-sm">PREP<em style="color:var(--cyan)">AI</em></div>
+      <div class="iv-session-info">
+        <b id="iv-company">—</b><br>
+        <span id="iv-role">—</span><br>
+        <span id="iv-round">HR Round</span>
+      </div>
+    </div>
+    <div class="iv-progress-block">
+      <div class="iv-prog-label">Progress <span id="iv-prog-txt">0 / 8</span></div>
+      <div class="pbar"><div class="pbar-fill" id="iv-pbar" style="width:0%"></div></div>
+    </div>
+    <div class="iv-q-list scroll-y" id="iv-q-list"></div>
+    <div class="iv-side-bottom">
+      <div class="iv-timer-display" id="iv-timer">00:00</div>
+      <button class="iv-end-btn" onclick="endEarly()">End Session</button>
+    </div>
+  </div>
+
+  <!-- CENTER: Main interview area -->
+  <div class="iv-main">
+
+    <!-- Top bar -->
+    <div class="iv-topbar">
+      <div class="iv-round-tag" id="iv-round-tag">HR Round</div>
+      <div class="live-indicator"><div class="live-dot"></div> LIVE</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="iv-bl-toggle-btn active" id="iv-bl-toggle" onclick="toggleBLPanel()">Hide Analysis</button>
+        <div class="iv-mode-tag" id="iv-mode-tag">Learning</div>
+      </div>
+    </div>
+
+    <!-- Center: AI interviewer + question -->
+    <div class="iv-center">
+      <div class="interviewer-panel" id="interviewer-panel">
+
+        <!-- Mic activity indicator -->
+        <div class="mic-status-iv" id="mic-status-iv">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+            <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+          </svg>
+          <span id="mic-iv-label">MIC OFF</span>
+        </div>
+
+        <!-- AI Avatar -->
+        <div class="ai-identity">
+          <div class="ai-avatar-wrap">
+            <div class="ai-avatar-outer"></div>
+            <div class="ai-avatar-mid"></div>
+            <div class="ai-avatar-inner">
+              <div class="ai-avatar-letter">A</div>
+            </div>
+            <div class="ai-speaking-ring"></div>
+          </div>
+          <div class="ai-name">ALEX — AI INTERVIEWER</div>
+          <div class="ai-title" id="iv-company-title">PrepAI · Interview Simulator</div>
+        </div>
+
+        <!-- Question display -->
+        <div class="question-display">
+          <div class="q-number-tag" id="q-num-label">Initializing...</div>
+          <div class="question-text" id="question-text">Connecting to your interviewer...</div>
+          <div class="speaking-bar" id="speaking-bar">
+            <div class="sbar"></div><div class="sbar"></div><div class="sbar"></div>
+            <div class="sbar"></div><div class="sbar"></div><div class="sbar"></div>
+            <div class="sbar"></div><div class="sbar"></div><div class="sbar"></div>
+          </div>
+          <div class="ai-status-label" id="ai-status-label">Initializing Gemini...</div>
+          <div class="gemini-thinking" id="gemini-thinking">
+            <div class="gthink-dot"></div>
+            <div class="gthink-dot"></div>
+            <div class="gthink-dot"></div>
+            <span style="margin-left:4px">Alex is thinking</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Inline feedback strip (learning mode) -->
+      <div class="feedback-strip" id="feedback-strip">
+        <div class="fb-strip-label">Instant Feedback — <span id="fb-q-ref">Q1</span></div>
+        <div class="fb-chips" id="fb-chips"></div>
+        <div class="fb-detail" id="fb-detail"></div>
+      </div>
+    </div>
+
+    <!-- ZOOM-STYLE BOTTOM BAR -->
+    <div class="zoom-bar">
+
+      <!-- Left: status -->
+      <div class="zoom-bar-left">
+        <div class="zoom-status-pill" id="zoom-status-pill">
+          <div class="zoom-status-dot" id="zoom-status-dot"></div>
+          <span id="zoom-status-text">Waiting...</span>
+        </div>
+      </div>
+
+      <!-- Center: controls -->
+      <div class="zoom-bar-center">
+
+        <!-- Mic toggle -->
+        <div class="zoom-ctrl-group">
+          <button class="zoom-ctrl-btn" id="iv-mic-btn" onclick="toggleIvMic()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+              <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+            </svg>
+          </button>
+          <span class="zoom-ctrl-label">Mic</span>
+        </div>
+
+        <!-- Camera toggle -->
+        <div class="zoom-ctrl-group">
+          <button class="zoom-ctrl-btn" id="iv-cam-btn" onclick="toggleIvCam()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.9L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+            </svg>
+          </button>
+          <span class="zoom-ctrl-label">Camera</span>
+        </div>
+
+        <!-- SPEAK button (big, center) -->
+        <div class="zoom-ctrl-group">
+          <button class="zoom-speak-btn" id="zoom-speak-btn" onclick="toggleListening()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+              <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+            </svg>
+          </button>
+          <span class="zoom-ctrl-label" id="speak-btn-label">Speak</span>
+        </div>
+
+        <!-- Submit answer -->
+        <div class="zoom-ctrl-group">
+          <button class="zoom-ctrl-btn zoom-submit-btn" id="zoom-submit-btn" onclick="submitVoiceAnswer()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </button>
+          <span class="zoom-ctrl-label">Submit</span>
+        </div>
+
+        <!-- Self-view toggle -->
+        <div class="zoom-ctrl-group">
+          <button class="zoom-ctrl-btn" id="iv-selfview-btn" onclick="toggleSelfView()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <path d="M8 21h8M12 17v4"/>
+            </svg>
+          </button>
+          <span class="zoom-ctrl-label">My Video</span>
+        </div>
+
+      </div>
+
+      <!-- Right: end call -->
+      <div class="zoom-bar-right">
+        <div class="zoom-ctrl-group">
+          <button class="zoom-end-btn" onclick="endEarly()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+          <span class="zoom-ctrl-label" style="color:var(--red);">End</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Transcript bar (slides up when speaking) -->
+    <div class="transcript-bar" id="transcript-bar">
+      <div class="transcript-bar-inner">
+        <div class="transcript-bar-wave" id="transcript-wave">
+          <div class="twbar"></div><div class="twbar"></div><div class="twbar"></div>
+          <div class="twbar"></div><div class="twbar"></div><div class="twbar"></div>
+          <div class="twbar"></div>
+        </div>
+        <div class="transcript-bar-text placeholder" id="transcript-bar-text">Speak your answer...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Body Language Analysis Panel -->
+  <div class="body-lang-panel" id="body-lang-panel">
+    <div class="blp-header">
+      <span class="blp-title">Body Language</span>
+      <span class="blp-live" id="blp-live-label">● LIVE</span>
+    </div>
+    <div class="blp-body" id="blp-body">
+      <div class="blp-waiting">
+        <div class="blp-waiting-icon">◉</div>
+        <div class="blp-waiting-text">Body language analysis will begin in 15 seconds.<br><br>Keep your camera on for real-time coaching.</div>
+      </div>
+      <div id="cheat-flags-section">
+        <div class="cheat-flags-clean">No integrity flags</div>
+      </div>
+    </div>
+    <div class="blp-next-scan">
+      <span style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;">Next scan in</span>
+      <span class="blp-countdown" id="blp-countdown">15s</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN 4 — FEEDBACK
+═══════════════════════════════════════ -->
+<div class="screen" id="s-feedback">
+  <div class="fb-container">
+
+    <!-- Header -->
+    <div class="fb-top">
+      <div>
+        <div class="fb-eyebrow">Session Complete · Gemini Report Generated</div>
+        <div class="fb-main-title">Interview<br>Report Card</div>
+        <div class="fb-tags">
+          <span class="fb-tag" id="fb-t-company">—</span>
+          <span class="fb-tag" id="fb-t-role">—</span>
+          <span class="fb-tag" id="fb-t-round">—</span>
+        </div>
+      </div>
+      <div class="fb-score-block">
+        <div class="fb-score-num" id="fb-score">—</div>
+        <div class="fb-score-sub">Overall Score / 100</div>
+      </div>
+    </div>
+
+    <!-- Verdict -->
+    <div class="verdict-bar" id="fb-verdict">Generating verdict...</div>
+
+    <!-- Category scores -->
+    <div class="fb-cats" id="fb-cats"></div>
+
+    <!-- Per-question breakdown -->
+    <div class="fb-section-head">Per-Question Breakdown</div>
+    <div id="fb-qlist"></div>
+
+    <!-- Concepts to strengthen -->
+    <div class="fb-strengthen">
+      <div class="fb-str-title">// Concepts to Strengthen</div>
+      <div class="str-items" id="fb-str-items"></div>
+    </div>
+
+    <!-- Body language summary -->
+    <div class="fb-body-lang" id="fb-body-lang">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3);">Loading body language data...</div>
+    </div>
+
+    <!-- Integrity / cheat detection report -->
+    <div class="fb-integrity">
+      <div class="fb-int-title">// Integrity Signals</div>
+      <div class="fb-int-sub">Analysis of speech cadence, language patterns, and eye movement during the session. These are observations, not judgements — use them to identify habits to fix.</div>
+      <div id="fb-integrity-content">
+        <div class="fb-int-clean">
+          <span>✓</span>
+          <span>Analyzing session data...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="fb-actions">
+      <button class="btn-sec" onclick="goSetup()">New Session</button>
+      <button class="btn-sec" onclick="rerunSame()">Same Config ↺</button>
+      <button class="btn-pri" onclick="goSetup()">Start Again →</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ JS — load order matters ═══ -->
+<script src="js/state.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/api.js"></script>
+<script src="js/research-phase.js"></script>
+<script src="js/speech.js"></script>
+<script src="js/cheat-detection.js"></script>
+<script src="js/video-analysis.js"></script>
+<script src="js/setup.js"></script>
+<script src="js/lobby.js"></script>
+<script src="js/interview.js"></script>
+<script src="js/feedback.js"></script>
+
+</body>
+</html>

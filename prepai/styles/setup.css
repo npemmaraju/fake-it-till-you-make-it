@@ -1,0 +1,89 @@
+/* ══════════════════════════════════════
+   SETUP.CSS — Setup Screen
+══════════════════════════════════════ */
+
+#s-setup {
+  flex-direction: column; align-items: center;
+  padding: 40px 20px 80px; background: var(--bg);
+}
+
+.topbar {
+  width: 100%; max-width: 1100px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 44px;
+}
+
+.setup-grid {
+  width: 100%; max-width: 1100px;
+  display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start;
+}
+
+/* ── API Key ── */
+.apikey-row {
+  display: flex; align-items: center; gap: 10px; background: var(--bg3);
+  border: 1px solid rgba(255,184,48,0.2); border-radius: var(--r); padding: 10px 14px; margin-bottom: 20px;
+}
+.apikey-icon { font-size: 14px; }
+.apikey-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--amber); font-family: var(--mono); font-size: 12px; letter-spacing: 0.05em;
+}
+.apikey-input::placeholder { color: var(--text3); }
+.apikey-status { font-family: var(--mono); font-size: 9px; color: var(--text3); white-space: nowrap; }
+.apikey-status.ok { color: var(--green); }
+
+/* ── File Drop ── */
+.file-drop {
+  border: 1px dashed var(--line3); border-radius: var(--r); padding: 20px; text-align: center;
+  cursor: pointer; transition: all 0.2s; background: var(--bg3); position: relative;
+}
+.file-drop:hover { border-color: var(--cyan); background: var(--cyan-glow); }
+.file-drop.uploaded { border-color: var(--green); border-style: solid; }
+.file-drop input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.file-drop-icon { font-family: var(--mono); font-size: 20px; color: var(--text3); margin-bottom: 6px; }
+.file-drop.uploaded .file-drop-icon { color: var(--green); }
+.file-drop-text { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+.file-drop.uploaded .file-drop-text { color: var(--green); }
+
+/* ── Round Tabs (2 tabs only — HR + Resume) ── */
+.round-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.rtab {
+  flex: 1; min-width: 150px; border: 1px solid var(--line2); border-radius: var(--r);
+  padding: 16px 18px; cursor: pointer; background: var(--bg3); transition: all 0.2s; text-align: left;
+}
+.rtab:hover { border-color: var(--line3); }
+.rtab.active { border-color: var(--cyan); background: var(--cyan-dim); }
+.rtab-tag { font-family: var(--mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+.rtab.active .rtab-tag { color: var(--cyan); }
+.rtab-name { font-family: var(--cond); font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.rtab-desc { font-size: 11px; color: var(--text3); line-height: 1.4; }
+
+/* ── Mode Grid ── */
+.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mcard { border: 1px solid var(--line2); border-radius: var(--r); padding: 16px; cursor: pointer; background: var(--bg3); transition: all 0.2s; }
+.mcard:hover { border-color: var(--line3); }
+.mcard.active { border-color: var(--amber); background: var(--amber-dim); }
+.mcard-name { font-family: var(--cond); font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 4px; }
+.mcard.active .mcard-name { color: var(--amber); }
+.mcard-desc { font-size: 11px; color: var(--text3); line-height: 1.45; }
+
+/* ── Side Panel ── */
+.side-panel { display: flex; flex-direction: column; gap: 14px; }
+
+.config-display {
+  background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r2); padding: 22px;
+  position: relative; overflow: hidden;
+}
+.config-display::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--amber), transparent); opacity: 0.3;
+}
+.config-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.config-row:last-child { border-bottom: none; }
+.config-key { font-family: var(--mono); font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; }
+.config-val { font-family: var(--mono); font-size: 11px; color: var(--cyan); }
+
+.hint-box { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r2); padding: 18px; }
+.hint-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.hint-list li { font-family: var(--mono); font-size: 10px; color: var(--text3); padding-left: 12px; position: relative; line-height: 1.5; }
+.hint-list li::before { content: '>'; position: absolute; left: 0; color: var(--cyan); opacity: 0.6; }

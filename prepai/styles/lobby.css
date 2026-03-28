@@ -1,0 +1,101 @@
+/* ══════════════════════════════════════
+   LOBBY.CSS — Lobby / Pre-Interview Screen
+══════════════════════════════════════ */
+
+#s-lobby {
+  flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg); padding: 20px; gap: 0;
+}
+
+.lobby-wrap {
+  width: 100%; max-width: 880px;
+  display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: center;
+}
+
+/* ── Camera Preview ── */
+.lobby-preview {
+  background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r2);
+  aspect-ratio: 16/9; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+#lobby-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: none; }
+
+.lobby-video-off { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.lobby-avatar-ring {
+  width: 72px; height: 72px; border-radius: 50%; background: var(--bg3); border: 2px solid var(--line3);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--cond); font-size: 28px; font-weight: 700; color: var(--text2);
+}
+.lobby-video-off p { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+/* Mic level bars */
+.mic-level-wrap { position: absolute; bottom: 14px; left: 14px; display: flex; align-items: flex-end; gap: 3px; height: 22px; }
+.mic-bar { width: 4px; background: var(--cyan); border-radius: 2px; transition: height 0.1s; min-height: 4px; }
+
+.lobby-name-tag {
+  position: absolute; bottom: 14px; right: 14px; background: rgba(0,0,0,0.6);
+  border: 1px solid var(--line2); border-radius: 6px; padding: 4px 10px;
+  font-family: var(--mono); font-size: 10px; color: var(--text2);
+}
+
+/* Camera / Mic toggle buttons in lobby preview */
+.lobby-ctrl-row {
+  position: absolute; bottom: -1px; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(5,8,12,0.9));
+  padding: 16px; display: flex; justify-content: center; gap: 10px;
+}
+.ctrl-btn {
+  width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line3); background: var(--bg3);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; color: var(--text2);
+}
+.ctrl-btn:hover { background: var(--bg4); color: var(--text); }
+.ctrl-btn.off { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+.ctrl-btn svg { width: 18px; height: 18px; }
+
+/* ── Lobby Side Panel ── */
+.lobby-side { display: flex; flex-direction: column; gap: 16px; }
+
+.lobby-heading { font-family: var(--cond); font-size: 28px; font-weight: 800; line-height: 1.1; color: var(--text); }
+.lobby-heading em { color: var(--cyan); font-style: normal; }
+
+.lobby-meta { font-family: var(--mono); font-size: 10px; color: var(--text3); line-height: 1.8; }
+.lobby-meta strong { color: var(--text2); font-weight: 400; }
+
+/* Device status rows */
+.device-row { display: flex; flex-direction: column; gap: 8px; }
+.device-item {
+  display: flex; align-items: center; gap: 10px; background: var(--bg3);
+  border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px;
+}
+.device-icon { color: var(--text3); width: 16px; height: 16px; }
+.device-label { font-family: var(--mono); font-size: 10px; color: var(--text2); flex: 1; }
+.device-status { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); }
+.device-status.ok { background: var(--green); }
+.device-status.err { background: var(--red); }
+
+/* Video show preference */
+.video-q-box { background: var(--bg2); border: 1px solid var(--line); border-radius: var(--r2); padding: 18px; }
+.video-q-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); margin-bottom: 10px; }
+.video-q-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.vq-opt {
+  border: 1px solid var(--line2); border-radius: var(--r); padding: 12px; cursor: pointer;
+  background: var(--bg3); text-align: center; transition: all 0.2s;
+  font-family: var(--mono); font-size: 11px; color: var(--text2);
+}
+.vq-opt:hover { border-color: var(--line3); color: var(--text); }
+.vq-opt.sel { border-color: var(--cyan); background: var(--cyan-dim); color: var(--cyan); }
+.vq-opt .vq-icon { font-size: 18px; display: block; margin-bottom: 5px; }
+
+/* Action buttons */
+.btn-join {
+  width: 100%; background: var(--cyan); color: #000; border: none; border-radius: var(--r);
+  padding: 14px; font-family: var(--cond); font-size: 16px; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; cursor: pointer; transition: all 0.2s;
+}
+.btn-join:hover { box-shadow: 0 4px 20px rgba(0,212,255,0.3); transform: translateY(-1px); }
+
+.btn-back {
+  width: 100%; background: transparent; color: var(--text3); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 10px; font-family: var(--mono); font-size: 11px; cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.btn-back:hover { color: var(--text2); border-color: var(--line2); }
