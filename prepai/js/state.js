@@ -66,7 +66,15 @@ const S = {
 
   /* ── Cheat detection ── */
   cheatFlags: [],             // [{type, detail, questionIndex, timestamp}]
-  // types: 'cadence' | 'gaze' | 'ai_text' | 'offscreen'
+  // types: 'cadence' | 'gaze' | 'ai_text' | 'offscreen' | 'multiple_faces' | 'eyes_down' | 'excessive_gaze' | 'background_audio'
+
+  /* ── Live detection (background audio + fast scan) ── */
+  liveDetection: {
+    audioMonitorId: null,     // setInterval handle for Web Audio API monitor
+    audioCtx: null,           // dedicated AudioContext for cheat detection
+    analyser: null,           // dedicated AnalyserNode
+    speechFrameCount: 0,      // consecutive frames with speech-like audio
+  },
 };
 
 /* ─── Fallback question banks ─── */

@@ -109,25 +109,42 @@ function detectAiLanguagePatterns(text) {
 function processVideoCheatSignal(cheatDetection, questionIndex) {
   if (!cheatDetection) return;
 
-  const { overallRisk, eyeMovement, backgroundAudio, speechContent } = cheatDetection;
+  const { overallRisk, multipleFaces, eyesDown, excessiveEyeMovement, backgroundAudio, speechContent } = cheatDetection;
 
-  // Eye movement flag
-  if (eyeMovement?.flag && eyeMovement.pattern && eyeMovement.pattern !== 'none') {
-    flagCheat('gaze',
-      `Eye movement pattern detected: ${eyeMovement.pattern}`,
+  // Multiple faces in frame
+  if (multipleFaces?.flag) {
+    const count = multipleFaces.count > 1 ? multipleFaces.count : '2+';
+    flagCheat('multiple_faces',
+      `${count} faces detected in frame. ${multipleFaces.observation !== 'none' ? multipleFaces.observation : 'Another person appears to be present.'}`,
       questionIndex
     );
   }
 
-  // Background audio flag
+  // Eyes looking down
+  if (eyesDown?.flag && eyesDown.observation && eyesDown.observation !== 'none') {
+    flagCheat('eyes_down',
+      `Sustained downward gaze detected — ${eyesDown.observation}`,
+      questionIndex
+    );
+  }
+
+  // Excessive / suspicious eye movement
+  if (excessiveEyeMovement?.flag && excessiveEyeMovement.observation && excessiveEyeMovement.observation !== 'none') {
+    flagCheat('excessive_gaze',
+      `Excessive eye movement: ${excessiveEyeMovement.observation}`,
+      questionIndex
+    );
+  }
+
+  // Background audio (visual inference from video frame)
   if (backgroundAudio?.flag && backgroundAudio.observation && backgroundAudio.observation !== 'none') {
     flagCheat('audio',
-      `Background audio anomaly: ${backgroundAudio.observation}`,
+      `Background audio signal: ${backgroundAudio.observation}`,
       questionIndex
     );
   }
 
-  // Speech content flag (from video read-aloud inference)
+  // Speech content flag (read-aloud pattern)
   if (speechContent?.flag && speechContent.observation && speechContent.observation !== 'none') {
     flagCheat('reading',
       `Delivery pattern: ${speechContent.observation}`,
@@ -135,21 +152,97 @@ function processVideoCheatSignal(cheatDetection, questionIndex) {
     );
   }
 
-  // High-risk triggers the prominent banner alert regardless of debounce
+  // Banner alert
   if (overallRisk === 'high') {
     const details = [
-      eyeMovement?.flag ? eyeMovement.pattern : null,
+      multipleFaces?.flag ? `${multipleFaces.count > 1 ? multipleFaces.count : '2+'} faces in frame` : null,
+      eyesDown?.flag ? 'eyes directed downward' : null,
+      excessiveEyeMovement?.flag ? excessiveEyeMovement.observation : null,
       backgroundAudio?.flag ? backgroundAudio.observation : null,
       speechContent?.flag ? speechContent.observation : null,
     ].filter(Boolean).join(' · ');
     showCheatAlert('HIGH INTEGRITY RISK DETECTED', details || 'Multiple suspicious signals observed simultaneously.');
   } else if (overallRisk === 'medium') {
     const detail = [
-      eyeMovement?.flag ? eyeMovement.pattern : null,
+      multipleFaces?.flag ? `${multipleFaces.count > 1 ? multipleFaces.count : 'Multiple'} faces in frame` : null,
+      eyesDown?.flag ? eyesDown.observation : null,
+      excessiveEyeMovement?.flag ? excessiveEyeMovement.observation : null,
       backgroundAudio?.flag ? backgroundAudio.observation : null,
       speechContent?.flag ? speechContent.observation : null,
     ].filter(Boolean)[0];
     if (detail) showCheatAlert('Integrity Flag', detail);
+  }
+}
+
+/* ── Background audio monitor (Web Audio API — real-time, no Gemini) ── */
+function startBackgroundAudioMonitor() {
+  if (!S.stream) return;
+
+  // Create a dedicated AudioContext + AnalyserNode with adequate frequency resolution
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;                  // 256 frequency bins
+    analyser.smoothingTimeConstant = 0.4;
+
+    const source = audioCtx.createMediaStreamSource(S.stream);
+    source.connect(analyser);
+
+    S.liveDetection.audioCtx = audioCtx;
+    S.liveDetection.analyser = analyser;
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount); // 256
+
+    // Speech sits roughly 85–3000 Hz.
+    // Bin width ≈ sampleRate / fftSize.  At 48 kHz → 93.75 Hz/bin.
+    // Bin 1 ≈ 94 Hz, Bin 32 ≈ 3000 Hz — good enough for voice detection.
+    const SPEECH_BIN_START = 1;
+    const SPEECH_BIN_END   = 32;
+    const ENERGY_THRESHOLD = 28;   // 0-255 average; speech typically 25-80
+    const TRIGGER_FRAMES   = 4;    // 4 × 400 ms = 1.6 s sustained audio before flag
+
+    S.liveDetection.audioMonitorId = setInterval(() => {
+      // Only flag when the user is NOT speaking (their mic is idle)
+      if (S.isListening) {
+        S.liveDetection.speechFrameCount = 0;
+        return;
+      }
+
+      analyser.getByteFrequencyData(dataArray);
+
+      let energy = 0;
+      for (let i = SPEECH_BIN_START; i <= SPEECH_BIN_END; i++) {
+        energy += dataArray[i];
+      }
+      energy /= (SPEECH_BIN_END - SPEECH_BIN_START + 1);
+
+      if (energy > ENERGY_THRESHOLD) {
+        S.liveDetection.speechFrameCount++;
+        if (S.liveDetection.speechFrameCount >= TRIGGER_FRAMES) {
+          flagCheat('background_audio',
+            `Sustained audio detected while you were not speaking — possible secondary speaker or background voice.`
+          );
+          S.liveDetection.speechFrameCount = 0; // reset after flagging
+        }
+      } else {
+        // Decay slowly so brief silence doesn't reset a near-trigger
+        S.liveDetection.speechFrameCount = Math.max(0, S.liveDetection.speechFrameCount - 1);
+      }
+    }, 400);
+
+  } catch (e) {
+    console.warn('Background audio monitor could not start:', e);
+  }
+}
+
+function stopBackgroundAudioMonitor() {
+  clearInterval(S.liveDetection.audioMonitorId);
+  S.liveDetection.audioMonitorId = null;
+  S.liveDetection.speechFrameCount = 0;
+  if (S.liveDetection.audioCtx) {
+    S.liveDetection.audioCtx.close().catch(() => {});
+    S.liveDetection.audioCtx = null;
+    S.liveDetection.analyser = null;
   }
 }
 
@@ -172,6 +265,20 @@ function flagCheat(type, detail, questionIndex = null) {
   showCheatWarning(type);
 }
 
+/* ── Shared type label map (used by both panel renderers) ── */
+const CHEAT_TYPE_LABELS = {
+  cadence:         'Speech Cadence',
+  ai_text:         'AI Language Patterns',
+  gaze:            'Eye Movement / Gaze',
+  excessive_gaze:  'Excessive Eye Movement',
+  eyes_down:       'Eyes Looking Down',
+  multiple_faces:  'Multiple Faces Detected',
+  audio:           'Background Audio (visual)',
+  background_audio:'Background Audio (live)',
+  reading:         'Read-Aloud Pattern',
+  offscreen:       'Off-Screen Activity',
+};
+
 /* ── Update the cheat flags section in the body language panel ── */
 function updateCheatFlagsUI() {
   const container = document.getElementById('cheat-flags-section');
@@ -184,16 +291,8 @@ function updateCheatFlagsUI() {
 
   const label = `<div class="cheat-flags-label">⚠ Integrity Signals (${S.cheatFlags.length})</div>`;
   const flags = S.cheatFlags.slice(-3).reverse().map(f => {
-    const typeLabels = {
-      cadence:  'Speech Cadence',
-      ai_text:  'AI Language Patterns',
-      gaze:     'Eye Movement / Gaze',
-      audio:    'Background Audio',
-      reading:  'Read-Aloud Pattern',
-      offscreen:'Off-Screen Activity'
-    };
     return `<div class="cheat-flag-item">
-      <div class="cheat-flag-type">${typeLabels[f.type] || f.type}</div>
+      <div class="cheat-flag-type">${CHEAT_TYPE_LABELS[f.type] || f.type}</div>
       <div class="cheat-flag-detail">${f.detail}</div>
       <div class="cheat-flag-time">Q${f.questionIndex} · ${new Date(f.timestamp).toLocaleTimeString()}</div>
     </div>`;
@@ -205,12 +304,16 @@ function updateCheatFlagsUI() {
 /* ── Toast warning (subtle — for cadence / AI text flags) ── */
 function showCheatWarning(type) {
   const msgs = {
-    cadence:  '⚠ Cadence flag — speech timing unusual',
-    ai_text:  '⚠ Answer patterns flagged — sounds scripted',
-    gaze:     '⚠ Eye movement flag detected',
-    audio:    '⚠ Background audio anomaly detected',
-    reading:  '⚠ Read-aloud pattern detected',
-    offscreen:'⚠ Off-screen activity detected'
+    cadence:          '⚠ Cadence flag — speech timing unusual',
+    ai_text:          '⚠ Answer patterns flagged — sounds scripted',
+    gaze:             '⚠ Eye movement flag detected',
+    excessive_gaze:   '⚠ Excessive eye movement detected',
+    eyes_down:        '⚠ Eyes looking down — possible notes',
+    multiple_faces:   '⚠ Multiple faces detected in frame',
+    audio:            '⚠ Background audio anomaly detected',
+    background_audio: '⚠ Background voice detected',
+    reading:          '⚠ Read-aloud pattern detected',
+    offscreen:        '⚠ Off-screen activity detected',
   };
   showToast(msgs[type] || '⚠ Integrity signal detected', 4000);
 }

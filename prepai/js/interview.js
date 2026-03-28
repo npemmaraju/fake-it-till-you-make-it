@@ -243,6 +243,7 @@ async function wrapUp() {
   stopSpeaking();
   clearInterval(S.timerInt);
   stopBodyLanguageAnalysis();
+  stopBackgroundAudioMonitor();
 
   const qt = document.getElementById('question-text');
   if (qt) qt.textContent = 'Session complete. Generating your report...';

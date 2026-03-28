@@ -1,2 +1,11 @@
 fastapi
-uvicorn
+uvicorn[standard]
+python-multipart
+python-dotenv
+google-genai
+google-cloud-firestore
+google-cloud-storage
+PyPDF2
+python-docx
+pydantic
+websockets

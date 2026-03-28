@@ -86,6 +86,7 @@ async function joinInterview() {
   S.bodyLang.noVideoWarned = false;
   S.researchIntel = '';
   S.researchDone = false;
+  S.liveDetection.speechFrameCount = 0;
 
   // Run research phase (shows overlay internally)
   await runResearchPhase();
@@ -110,6 +111,9 @@ async function joinInterview() {
 
   // Start body language analysis (after a short delay to let UI settle)
   setTimeout(startBodyLanguageAnalysis, 2000);
+
+  // Start real-time background audio monitor
+  startBackgroundAudioMonitor();
 
   // Ask first question
   setTimeout(() => presentQuestion(), 600);

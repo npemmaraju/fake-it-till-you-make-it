@@ -5,7 +5,7 @@
    updates the body language panel in real-time.
 ═══════════════════════════════════════════ */
 
-const BL_INTERVAL_MS = 15000;  // analyze every 15 seconds
+const BL_INTERVAL_MS = 8000;   // analyze every 8 seconds (faster for live cheat detection)
 const BL_COUNTDOWN_TICK = 1000;
 
 /* ── Start periodic analysis ── */
@@ -130,6 +130,9 @@ function renderBLPanel(result) {
   const conCls = scoreToClass(c.confidence);
   const delCls = scoreToClass(c.delivery);
 
+  const faceBadge = cd?.multipleFaces?.flag
+    ? `<span class="cheat-risk-badge risk-high">${cd.multipleFaces.count > 1 ? cd.multipleFaces.count : '2+'} FACES</span>`
+    : '';
   const riskBadge = cd ? `<span class="cheat-risk-badge risk-${cd.overallRisk}">${cd.overallRisk.toUpperCase()} RISK</span>` : '';
 
   body.innerHTML = `
@@ -146,7 +149,7 @@ function renderBLPanel(result) {
       </div>
     </div>
     <div class="blp-verdict">
-      <div class="blp-verdict-label">Strength ${riskBadge}</div>
+      <div class="blp-verdict-label">Strength ${faceBadge}${riskBadge}</div>
       ${escapeHtml(c.topStrength || c.verdict || 'No notes yet.')}
     </div>
     ${c.topImprovement ? `<div class="blp-verdict" style="margin-top:6px">
@@ -174,14 +177,11 @@ function renderCheatFlagsInline() {
   if (S.cheatFlags.length === 0) {
     return '<div class="cheat-flags-clean">No integrity flags</div>';
   }
-  const typeLabels = {
-    cadence: 'Cadence', ai_text: 'AI Language',
-    gaze: 'Gaze', offscreen: 'Off-Screen'
-  };
+  // CHEAT_TYPE_LABELS is defined in cheat-detection.js (shared global)
   return `<div class="cheat-flags-label">⚠ Flags (${S.cheatFlags.length})</div>` +
     S.cheatFlags.slice(-2).reverse().map(f => `
       <div class="cheat-flag-item">
-        <div class="cheat-flag-type">${typeLabels[f.type] || f.type}</div>
+        <div class="cheat-flag-type">${(typeof CHEAT_TYPE_LABELS !== 'undefined' ? CHEAT_TYPE_LABELS[f.type] : null) || f.type}</div>
         <div class="cheat-flag-detail">${escapeHtml(f.detail)}</div>
       </div>`).join('');
 }

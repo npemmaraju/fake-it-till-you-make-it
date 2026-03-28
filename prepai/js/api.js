@@ -209,42 +209,59 @@ Be brutally honest and specific. Reference their actual answer.`;
 
 /* ── Body language + cheat detection analysis ── */
 async function analyzeBodyLanguage(base64Image) {
-  const prompt = `You are an expert interview coach and behavioral analyst reviewing a video interview frame. Your job is two-fold: (1) detect signs of cheating or AI assistance, and (2) give honest, calibrated coaching feedback.
-
-Analyze ALL available signals: visual (face, eyes, posture, gestures) and content (naturalness of presence, focus, delivery energy).
+  const prompt = `You are an expert interview coach and behavioral analyst reviewing a video interview frame. Detect cheating signals AND provide coaching feedback.
 
 ---
 
-CHEAT DETECTION — analyze these signals independently, then combine into a risk score:
+CHEAT DETECTION — analyze each signal independently:
 
-EYE MOVEMENT PATTERNS:
-- Suspicious: Rhythmic left-to-right scanning at a fixed vertical position (reading), rapid repeated glances to a specific offscreen point (second monitor/notes), prolonged downward gaze mid-answer
-- Normal (not suspicious): Brief upward/sideways glances while thinking, natural blink rate, returning gaze to camera after pauses
+1. FACE COUNT
+- Count every distinct human face visible in the frame.
+- flag=true if faceCount > 1 (another person is present or visible on a screen behind the candidate).
 
-SPEECH & DELIVERY (infer from visual cues — posture, eye direction, engagement):
-- Suspicious: Candidate appears to be reading (downward fixed gaze, head still, no natural thinking pauses), body unusually rigid while speaking
-- Normal: Natural head movement, thinking glances upward, relaxed posture
+2. EYES LOOKING DOWN
+- flag=true if the candidate's gaze is directed clearly downward (at a desk, phone, notes, or lap) rather than toward the camera or in natural thinking directions (sideways/upward).
+- Distinguish: brief chin-drop while thinking is normal. Sustained downward gaze at a fixed point is suspicious.
+
+3. EXCESSIVE EYE MOVEMENT
+- flag=true if eyes are making rapid, repetitive lateral scanning movements at a consistent vertical level — the pattern seen when reading text on a screen or page.
+- Normal: brief glances up/sideways while thinking. Suspicious: rhythmic left-right scanning, repeated snaps to one offscreen point.
+
+4. BACKGROUND AUDIO (infer visually)
+- flag=true if you can infer a second speaker — e.g., candidate's lips are still but head turns toward an off-camera voice, or visible reaction to unheard speech.
+
+5. SCRIPTED READING
+- flag=true if the candidate appears to be reading: downward fixed gaze, minimal natural pauses, head does not move, body is unusually rigid.
 
 ---
 
 COACHING METRICS (score 0–100):
 - 70 = average, 85+ = strong, below 50 = needs work
-- eyeContact: Is gaze directed at camera? Sustained = high. Repeated downward/offscreen = low.
-- posture: Upright, professional framing? Slouching, poor angle, leaning back = low.
-- confidence: Relaxed but engaged presence. Visible tension, fast blinking, stiff jaw = low.
-- delivery: How present and engaged do they appear? Monotone stillness = low. Animated, focused = high.
-- gestures: Rate as "minimal" (stiff, no movement), "natural" (appropriate, reinforces speech), or "excessive" (distracting)
+- eyeContact: Sustained camera gaze = high. Repeated downward/offscreen = low.
+- posture: Upright, professional. Slouching or leaning = low.
+- confidence: Relaxed but engaged. Visible tension = low.
+- delivery: Present and animated = high. Monotone stillness = low.
+- gestures: "minimal" | "natural" | "excessive"
 
 ---
 
-Return ONLY this JSON (no markdown, no commentary):
+Return ONLY this JSON (no markdown):
 
 {
   "cheatDetection": {
     "overallRisk": "low",
-    "eyeMovement": {
+    "multipleFaces": {
       "flag": false,
-      "pattern": "none"
+      "count": 1,
+      "observation": "none"
+    },
+    "eyesDown": {
+      "flag": false,
+      "observation": "none"
+    },
+    "excessiveEyeMovement": {
+      "flag": false,
+      "observation": "none"
     },
     "backgroundAudio": {
       "flag": false,
@@ -267,7 +284,7 @@ Return ONLY this JSON (no markdown, no commentary):
 }
 
 overallRisk: "low" | "medium" | "high"
-Be calibrated. A single offscreen glance is not a flag. Only flag patterns that are repeated, rhythmic, or structurally suspicious.`;
+Be calibrated. A single glance is not a flag. Only flag repeated, rhythmic, or structurally suspicious patterns.`;
 
   try {
     const resp = await callGeminiVision(base64Image, prompt);
