@@ -105,18 +105,51 @@ function detectAiLanguagePatterns(text) {
   }
 }
 
-/* ── Vector 3: Process gaze signal from video analysis ── */
-function processVideoCheatSignal(signal, questionIndex) {
-  if (!signal || signal === 'none') return;
+/* ── Vector 3: Process cheatDetection object from video analysis ── */
+function processVideoCheatSignal(cheatDetection, questionIndex) {
+  if (!cheatDetection) return;
 
-  const messages = {
-    reading: 'Eyes detected in a left-to-right scanning pattern consistent with reading from notes or a screen.',
-    offscreen: 'Candidate repeatedly looking away from camera — possibly consulting off-screen notes or a second device.',
-    distracted: 'Attention appears scattered — eyes frequently moving off-camera without a clear focal point.'
-  };
+  const { overallRisk, eyeMovement, backgroundAudio, speechContent } = cheatDetection;
 
-  if (messages[signal]) {
-    flagCheat('gaze', messages[signal], questionIndex);
+  // Eye movement flag
+  if (eyeMovement?.flag && eyeMovement.pattern && eyeMovement.pattern !== 'none') {
+    flagCheat('gaze',
+      `Eye movement pattern detected: ${eyeMovement.pattern}`,
+      questionIndex
+    );
+  }
+
+  // Background audio flag
+  if (backgroundAudio?.flag && backgroundAudio.observation && backgroundAudio.observation !== 'none') {
+    flagCheat('audio',
+      `Background audio anomaly: ${backgroundAudio.observation}`,
+      questionIndex
+    );
+  }
+
+  // Speech content flag (from video read-aloud inference)
+  if (speechContent?.flag && speechContent.observation && speechContent.observation !== 'none') {
+    flagCheat('reading',
+      `Delivery pattern: ${speechContent.observation}`,
+      questionIndex
+    );
+  }
+
+  // High-risk triggers the prominent banner alert regardless of debounce
+  if (overallRisk === 'high') {
+    const details = [
+      eyeMovement?.flag ? eyeMovement.pattern : null,
+      backgroundAudio?.flag ? backgroundAudio.observation : null,
+      speechContent?.flag ? speechContent.observation : null,
+    ].filter(Boolean).join(' · ');
+    showCheatAlert('HIGH INTEGRITY RISK DETECTED', details || 'Multiple suspicious signals observed simultaneously.');
+  } else if (overallRisk === 'medium') {
+    const detail = [
+      eyeMovement?.flag ? eyeMovement.pattern : null,
+      backgroundAudio?.flag ? backgroundAudio.observation : null,
+      speechContent?.flag ? speechContent.observation : null,
+    ].filter(Boolean)[0];
+    if (detail) showCheatAlert('Integrity Flag', detail);
   }
 }
 
@@ -152,10 +185,12 @@ function updateCheatFlagsUI() {
   const label = `<div class="cheat-flags-label">⚠ Integrity Signals (${S.cheatFlags.length})</div>`;
   const flags = S.cheatFlags.slice(-3).reverse().map(f => {
     const typeLabels = {
-      cadence: 'Speech Cadence',
-      ai_text: 'AI Language Patterns',
-      gaze: 'Eye Movement / Gaze',
-      offscreen: 'Off-Screen Activity'
+      cadence:  'Speech Cadence',
+      ai_text:  'AI Language Patterns',
+      gaze:     'Eye Movement / Gaze',
+      audio:    'Background Audio',
+      reading:  'Read-Aloud Pattern',
+      offscreen:'Off-Screen Activity'
     };
     return `<div class="cheat-flag-item">
       <div class="cheat-flag-type">${typeLabels[f.type] || f.type}</div>
@@ -167,15 +202,41 @@ function updateCheatFlagsUI() {
   container.innerHTML = label + flags;
 }
 
-/* ── Subtle toast warning ── */
+/* ── Toast warning (subtle — for cadence / AI text flags) ── */
 function showCheatWarning(type) {
   const msgs = {
-    cadence: '⚠ Cadence flag — speech timing unusual',
-    ai_text: '⚠ Answer patterns flagged — sounds scripted',
-    gaze: '⚠ Eye contact flag — look at the camera',
-    offscreen: '⚠ Off-screen activity detected'
+    cadence:  '⚠ Cadence flag — speech timing unusual',
+    ai_text:  '⚠ Answer patterns flagged — sounds scripted',
+    gaze:     '⚠ Eye movement flag detected',
+    audio:    '⚠ Background audio anomaly detected',
+    reading:  '⚠ Read-aloud pattern detected',
+    offscreen:'⚠ Off-screen activity detected'
   };
   showToast(msgs[type] || '⚠ Integrity signal detected', 4000);
+}
+
+/* ── Prominent banner alert (for video cheat detection) ── */
+let _cheatAlertTimer = null;
+
+function showCheatAlert(title, msg) {
+  const banner = document.getElementById('cheat-alert-banner');
+  if (!banner) return;
+
+  document.getElementById('cheat-alert-title').textContent = title;
+  document.getElementById('cheat-alert-msg').textContent = msg;
+
+  banner.classList.remove('hidden', 'dismissing');
+
+  // Auto-dismiss after 8 seconds
+  clearTimeout(_cheatAlertTimer);
+  _cheatAlertTimer = setTimeout(dismissCheatAlert, 8000);
+}
+
+function dismissCheatAlert() {
+  const banner = document.getElementById('cheat-alert-banner');
+  if (!banner) return;
+  banner.classList.add('dismissing');
+  setTimeout(() => banner.classList.add('hidden'), 300);
 }
 
 /* ── Get cheat summary for feedback report ── */

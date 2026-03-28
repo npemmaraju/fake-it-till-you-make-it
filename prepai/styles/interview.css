@@ -355,3 +355,55 @@
   background: rgba(255,255,255,0.1); border: none; border-radius: 4px;
   color: rgba(255,255,255,0.6); font-size: 11px; cursor: pointer; padding: 1px 6px; line-height: 1.6;
 }
+
+/* ── CHEAT RISK BADGE (in BL panel) ── */
+.cheat-risk-badge {
+  display: inline-block; font-family: var(--mono); font-size: 8px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle;
+}
+.risk-low  { background: rgba(0,200,100,0.12); color: var(--green); border: 1px solid rgba(0,200,100,0.3); }
+.risk-medium { background: rgba(255,165,0,0.12); color: #ffaa00; border: 1px solid rgba(255,165,0,0.3); }
+.risk-high { background: rgba(255,68,68,0.15); color: var(--red); border: 1px solid rgba(255,68,68,0.4); }
+
+/* ── CHEAT ALERT BANNER ── */
+.cheat-alert-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 20px;
+  background: linear-gradient(90deg, rgba(20,4,4,0.98), rgba(30,6,6,0.98));
+  border-bottom: 2px solid var(--red);
+  box-shadow: 0 4px 30px rgba(255,68,68,0.3);
+  animation: alertSlideIn 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.cheat-alert-banner.hidden { display: none; }
+.cheat-alert-banner.dismissing { opacity: 0; transform: translateY(-100%); }
+
+@keyframes alertSlideIn {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+.cheat-alert-icon {
+  font-size: 22px; flex-shrink: 0;
+  animation: iconPulse 1.2s ease infinite;
+}
+@keyframes iconPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+.cheat-alert-body { flex: 1; min-width: 0; }
+.cheat-alert-title {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--red); margin-bottom: 3px;
+}
+.cheat-alert-msg { font-size: 13px; color: rgba(255,255,255,0.85); line-height: 1.4; }
+
+.cheat-alert-close {
+  background: rgba(255,68,68,0.12); border: 1px solid rgba(255,68,68,0.3);
+  border-radius: 6px; color: var(--red); font-size: 13px;
+  cursor: pointer; padding: 4px 10px; flex-shrink: 0; transition: background 0.2s;
+}
+.cheat-alert-close:hover { background: rgba(255,68,68,0.25); }

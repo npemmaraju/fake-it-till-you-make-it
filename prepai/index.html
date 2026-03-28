@@ -57,16 +57,6 @@
           <div class="panel-title">Set up your<br>interview session</div>
           <div class="panel-sub">Paste the JD, upload your resume, pick your round. We'll research the company and tailor every question.</div>
 
-          <!-- API Key -->
-          <div class="field">
-            <div class="field-lbl">Gemini API Key <span>from aistudio.google.com — free tier works</span></div>
-            <div class="apikey-row">
-              <span class="apikey-icon">🔑</span>
-              <input class="apikey-input" type="password" id="api-key" placeholder="AIza..." oninput="onApiKeyChange(this)">
-              <span class="apikey-status" id="api-key-status">not set</span>
-            </div>
-          </div>
-
           <!-- Job Description -->
           <div class="field">
             <div class="field-lbl">Job Description <span>paste from company site — the more detail the better</span></div>
@@ -144,7 +134,7 @@ We are looking for a Software Engineer to join our Platform team. You will be re
           <div class="config-row"><div class="config-key">Mode</div><div class="config-val" id="cfg-mode">Learning</div></div>
           <div class="config-row"><div class="config-key">JD</div><div class="config-val" id="cfg-jd">—</div></div>
           <div class="config-row"><div class="config-key">Resume</div><div class="config-val" id="cfg-resume">—</div></div>
-          <div class="config-row"><div class="config-key">API Key</div><div class="config-val" id="cfg-apikey">—</div></div>
+          <div class="config-row"><div class="config-key">API Key</div><div class="config-val" id="cfg-apikey" style="color:var(--cyan)">✓ loaded</div></div>
         </div>
 
         <button class="btn-launch" id="launch-btn" onclick="goToLobby()">
@@ -258,6 +248,16 @@ We are looking for a Software Engineer to join our Platform team. You will be re
 ═══════════════════════════════════════ -->
 <div class="screen" id="s-interview">
 
+  <!-- Cheat alert banner — shown on detection -->
+  <div id="cheat-alert-banner" class="cheat-alert-banner hidden">
+    <div class="cheat-alert-icon">⚠</div>
+    <div class="cheat-alert-body">
+      <div class="cheat-alert-title" id="cheat-alert-title">Integrity Flag Detected</div>
+      <div class="cheat-alert-msg" id="cheat-alert-msg"></div>
+    </div>
+    <button class="cheat-alert-close" onclick="dismissCheatAlert()">✕</button>
+  </div>
+
   <!-- LEFT: Question sidebar -->
   <div class="iv-side">
     <div class="iv-side-top">
@@ -287,6 +287,7 @@ We are looking for a Software Engineer to join our Platform team. You will be re
       <div class="iv-round-tag" id="iv-round-tag">HR Round</div>
       <div class="live-indicator"><div class="live-dot"></div> LIVE</div>
       <div style="display:flex;align-items:center;gap:10px;">
+        <button class="iv-bl-toggle-btn active" id="tts-toggle-btn" onclick="toggleTTS()" title="Toggle interviewer voice">🔊 Voice On</button>
         <button class="iv-bl-toggle-btn active" id="iv-bl-toggle" onclick="toggleBLPanel()">Hide Analysis</button>
         <div class="iv-mode-tag" id="iv-mode-tag">Learning</div>
       </div>
@@ -535,11 +536,13 @@ We are looking for a Software Engineer to join our Platform team. You will be re
 </div>
 
 <!-- ═══ JS — load order matters ═══ -->
+<script src="config.js"></script>
 <script src="js/state.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/api.js"></script>
 <script src="js/research-phase.js"></script>
 <script src="js/speech.js"></script>
+<script src="js/tts.js"></script>
 <script src="js/cheat-detection.js"></script>
 <script src="js/video-analysis.js"></script>
 <script src="js/setup.js"></script>

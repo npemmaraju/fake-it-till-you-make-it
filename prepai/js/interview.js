@@ -90,12 +90,14 @@ async function presentQuestion(userAnswer = '') {
 
   setAiStatus('speaking');
 
-  // Simulate speaking time, then allow user to respond
-  const speakDuration = Math.min(3000, 1200 + question.length * 18);
-  setTimeout(() => {
-    setAiStatus('waiting');
-    S.waitingAnswer = true;
-  }, speakDuration);
+  // Speak the question aloud, then enable response when done
+  speakQuestion(question, () => {
+    // Small grace period after speech ends before enabling mic
+    setTimeout(() => {
+      setAiStatus('waiting');
+      S.waitingAnswer = true;
+    }, 400);
+  });
 
   // Track question (only if not a depth follow-up)
   if (S.currentQDepth === 0 || S.currentQ === 0) {
@@ -238,6 +240,7 @@ function tickTimer() {
 async function wrapUp() {
   S.waitingAnswer = false;
   setListeningState(false);
+  stopSpeaking();
   clearInterval(S.timerInt);
   stopBodyLanguageAnalysis();
 

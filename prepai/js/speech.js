@@ -76,9 +76,17 @@ function updateTranscriptDisplay(text) {
 
 function toggleListening() {
   if (!S.waitingAnswer) {
+    // Let user interrupt TTS mid-sentence
+    if (window.speechSynthesis?.speaking) {
+      stopSpeaking();
+      setTimeout(() => { setAiStatus('waiting'); S.waitingAnswer = true; toggleListening(); }, 200);
+      return;
+    }
     showToast('Wait for the question to finish first.');
     return;
   }
+  // Stop TTS if it's still going when user hits Speak
+  stopSpeaking();
   if (S.isListening) {
     setListeningState(false);
     // Auto-submit after 2s pause if there's content

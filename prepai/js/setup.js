@@ -93,7 +93,7 @@ async function goToLobby() {
   S.company = document.getElementById('company')?.value.trim() || 'Target Company';
   S.role    = document.getElementById('jobtitle')?.value.trim() || 'Software Engineer';
   S.jdText  = document.getElementById('jd-text')?.value.trim() || '';
-  S.apiKey  = document.getElementById('api-key')?.value.trim() || '';
+  S.apiKey  = document.getElementById('api-key')?.value.trim() || window.PREPAI_CONFIG?.geminiApiKey || '';
 
   // Populate lobby
   const lobbyCompany = document.getElementById('lobby-company');
@@ -146,5 +146,20 @@ async function goToLobby() {
   }
 }
 
+/* ── Auto-fill API key from config.js if present ── */
+function initFromConfig() {
+  const configKey = window.PREPAI_CONFIG?.geminiApiKey;
+  if (configKey && configKey !== 'YOUR_GEMINI_API_KEY_HERE') {
+    const input = document.getElementById('api-key');
+    if (input && !input.value) {
+      input.value = configKey;
+      onApiKeyChange(input);
+    }
+  }
+}
+
 // Initialize listeners when DOM is ready
-document.addEventListener('DOMContentLoaded', setupInputListeners);
+document.addEventListener('DOMContentLoaded', () => {
+  setupInputListeners();
+  initFromConfig();
+});

@@ -6,9 +6,15 @@
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const GEMINI_MODEL = 'gemini-2.0-flash';
 
+/* ── Resolve effective API key (state → config file fallback) ── */
+function getApiKey() {
+  return S.apiKey || window.PREPAI_CONFIG?.geminiApiKey || null;
+}
+
 /* ── Core text generation ── */
 async function callGemini(messages, systemPrompt = '', opts = {}) {
-  if (!S.apiKey) return null;
+  const key = getApiKey();
+  if (!key) return null;
   try {
     const body = {
       model: GEMINI_MODEL,
@@ -26,7 +32,7 @@ async function callGemini(messages, systemPrompt = '', opts = {}) {
     }
 
     const resp = await fetch(
-      `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${S.apiKey}`,
+      `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
     );
     if (!resp.ok) {
@@ -44,7 +50,8 @@ async function callGemini(messages, systemPrompt = '', opts = {}) {
 
 /* ── Vision (multimodal) ── */
 async function callGeminiVision(base64Image, prompt) {
-  if (!S.apiKey) return null;
+  const key = getApiKey();
+  if (!key) return null;
   try {
     const body = {
       contents: [{
@@ -56,7 +63,7 @@ async function callGeminiVision(base64Image, prompt) {
       generationConfig: { maxOutputTokens: 400, temperature: 0.2 }
     };
     const resp = await fetch(
-      `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${S.apiKey}`,
+      `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
     );
     if (!resp.ok) return null;
@@ -70,7 +77,8 @@ async function callGeminiVision(base64Image, prompt) {
 
 /* ── Search grounding (for company research) ── */
 async function callGeminiWithSearch(prompt) {
-  if (!S.apiKey) return null;
+  const key = getApiKey();
+  if (!key) return null;
   try {
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -78,7 +86,7 @@ async function callGeminiWithSearch(prompt) {
       generationConfig: { maxOutputTokens: 1200, temperature: 0.3 }
     };
     const resp = await fetch(
-      `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${S.apiKey}`,
+      `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${key}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
     );
     if (!resp.ok) return null;
@@ -90,62 +98,48 @@ async function callGeminiWithSearch(prompt) {
   }
 }
 
-/* ── System prompt builder ── */
+/* ── System prompt builder — adaptive manager persona ── */
 function buildSystemPrompt() {
-  const roundMap = { hr: 'HR/Behavioral', resume: 'Resume Deep-Dive' };
-  const roundType = roundMap[S.round] || 'General';
+  const isResume = S.round === 'resume';
 
-  // Detect key resume claims for drilling
   const resumeSnippet = S.resumeText
-    ? S.resumeText.slice(0, 2500)
-    : 'No resume provided — ask the candidate to describe their experience.';
+    ? S.resumeText.slice(0, 3000)
+    : 'No resume provided — ask the candidate to describe their experience and tech stack.';
 
-  // Build weakness context from answered questions
-  const weaknessContext = S.qHistory
-    .filter(q => q.answer && (q.score === 'bad' || q.score === 'ok'))
-    .slice(-3)
-    .map(q => `Question: "${q.q.slice(0, 80)}"\nCandidate gave a weak/vague answer: "${q.answer.slice(0, 100)}"`)
-    .join('\n\n');
-
-  const researchContext = S.researchIntel
-    ? `\n\nCOMPANY INTERVIEW INTELLIGENCE (sourced from public reports — Reddit, Glassdoor, engineering blogs):\n${S.researchIntel}\n\nUse this intelligence to mirror the actual interview experience at ${S.company}.`
+  const researchSection = S.researchIntel
+    ? `\nCOMPANY INTERVIEW INTEL (from recent interviews at ${S.company}):\n${S.researchIntel}`
     : '';
 
-  const weaknessSection = weaknessContext
-    ? `\n\nWEAKNESSES DETECTED SO FAR — drill into these:\n${weaknessContext}`
-    : '';
+  const roundContext = isResume
+    ? `This is a technical/resume round. Probe technical depth, architectural decisions, and whether the candidate truly understands the tools and systems they claim to have built. When they mention a technology, algorithm, or system — dig into HOW it works, WHY they chose it, and WHAT went wrong.`
+    : `This is an HR/behavioral round. Probe communication clarity, ownership, how they handle failure and ambiguity, and genuine motivation for joining ${S.company || 'this company'}.`;
 
-  return `You are ALEX, a senior ${roundType} interviewer at ${S.company || 'a top tech company'} for the role of ${S.role || 'Software Engineer'}.
+  return `You are a senior engineering manager at ${S.company || 'a top tech company'} interviewing a candidate for the role of ${S.role || 'Software Engineer'}.
+
+You have read the job description and the candidate's resume. Conduct this interview the way you would naturally — you're not running through a script, you're genuinely evaluating whether this person can do the job.
 
 JOB DESCRIPTION:
-${S.jdText || 'General software engineering role'}
+${S.jdText || 'General software engineering role — strong technical fundamentals required.'}
 
 CANDIDATE RESUME:
 ${resumeSnippet}
-${researchContext}
-${weaknessSection}
+${researchSection}
 
-INTERVIEW FLOW — FOLLOW THIS STRICTLY:
-1. ALWAYS start with "Tell me about yourself" — let them walk through their background
-2. Then: "Walk me through [most prominent project on resume]" — force specifics
-3. Deep dive on that project: architecture decisions, your role vs team, impact, what broke, how you fixed it
-4. Role-specific questions from the JD — test exactly what the JD asks for
-5. Behavioral/situational questions (STAR format expected)
-6. Company-specific: culture fit, why this company (test if they actually researched it)
-7. ALWAYS end with: "Do you have any questions for me?" — evaluate question quality
+ROUND: ${roundContext}
 
-CRITICAL RULES:
-- ONE question at a time. Never compound questions.
-- Follow up HARD on vague answers — if they say "we built X", ask "what specifically did YOU do"
-- If they claim a skill, test it immediately with a specific scenario
-- If their answer is too short, probe: "Tell me more about that"
-- If they use filler words or sound rehearsed, disrupt with an unexpected angle
-- Reference their actual resume claims — name specific projects, companies, dates
-- For resume round: challenge EVERY claim on their resume, ask for numbers, names, specifics
-- For HR round: use STAR probing if a story seems vague or rehearsed (Situation → Task → Action → Result → Impact)
-- Never repeat a question already asked
-- Be direct and real — no corporate fluff, no "great question!", no soft-peddling
-- Respond ONLY with the next interview question. Nothing else. No preamble.`;
+HOW YOU INTERVIEW:
+- Start with "Tell me about yourself" and let them set the stage — then immediately follow threads from what they say
+- When they mention a specific technology, project, decision, or outcome: dig into it. Ask HOW it works, WHY they made that decision, WHAT the tradeoffs were
+- When they use "we" without "I": ask what THEY personally did
+- When they state a metric or result: ask for the baseline, the measurement method, and the business impact
+- When an answer is shallow or vague: probe it — don't accept a non-answer
+- When an answer reveals genuine depth: go deeper into that area
+- Let gaps in their knowledge surface naturally — don't telegraph what you're testing
+- Ask ONE question at a time. Never two-part questions.
+- Never say "great", "interesting", or any filler — just your next question
+- Never ask a question already covered in the conversation
+
+OUTPUT: Only the next interview question. No preamble. No "sure!" Just the question.`;
 }
 
 /* ── Get next question from Gemini ── */
@@ -184,7 +178,7 @@ async function getGeminiQuestion(userAnswer = '') {
 
 /* ── Per-answer inline feedback ── */
 async function getGeminiFeedback(question, answer) {
-  if (!S.apiKey) return getStaticFeedback();
+  if (!getApiKey()) return getStaticFeedback();
 
   const prompt = `You are a tough but fair interview coach. Analyze this interview answer concisely.
 
@@ -213,29 +207,67 @@ Be brutally honest and specific. Reference their actual answer.`;
   return getStaticFeedback();
 }
 
-/* ── Body language analysis ── */
+/* ── Body language + cheat detection analysis ── */
 async function analyzeBodyLanguage(base64Image) {
-  const prompt = `You are analyzing a job interview candidate in a video call. Look at this frame carefully.
+  const prompt = `You are an expert interview coach and behavioral analyst reviewing a video interview frame. Your job is two-fold: (1) detect signs of cheating or AI assistance, and (2) give honest, calibrated coaching feedback.
 
-Analyze and respond ONLY in this exact JSON format (no markdown):
+Analyze ALL available signals: visual (face, eyes, posture, gestures) and content (naturalness of presence, focus, delivery energy).
+
+---
+
+CHEAT DETECTION — analyze these signals independently, then combine into a risk score:
+
+EYE MOVEMENT PATTERNS:
+- Suspicious: Rhythmic left-to-right scanning at a fixed vertical position (reading), rapid repeated glances to a specific offscreen point (second monitor/notes), prolonged downward gaze mid-answer
+- Normal (not suspicious): Brief upward/sideways glances while thinking, natural blink rate, returning gaze to camera after pauses
+
+SPEECH & DELIVERY (infer from visual cues — posture, eye direction, engagement):
+- Suspicious: Candidate appears to be reading (downward fixed gaze, head still, no natural thinking pauses), body unusually rigid while speaking
+- Normal: Natural head movement, thinking glances upward, relaxed posture
+
+---
+
+COACHING METRICS (score 0–100):
+- 70 = average, 85+ = strong, below 50 = needs work
+- eyeContact: Is gaze directed at camera? Sustained = high. Repeated downward/offscreen = low.
+- posture: Upright, professional framing? Slouching, poor angle, leaning back = low.
+- confidence: Relaxed but engaged presence. Visible tension, fast blinking, stiff jaw = low.
+- delivery: How present and engaged do they appear? Monotone stillness = low. Animated, focused = high.
+- gestures: Rate as "minimal" (stiff, no movement), "natural" (appropriate, reinforces speech), or "excessive" (distracting)
+
+---
+
+Return ONLY this JSON (no markdown, no commentary):
+
 {
-  "eyeContact": 72,
-  "posture": 65,
-  "confidence": 70,
-  "gestures": "natural",
-  "verdict": "One specific coaching observation",
-  "cheatSignal": "none"
+  "cheatDetection": {
+    "overallRisk": "low",
+    "eyeMovement": {
+      "flag": false,
+      "pattern": "none"
+    },
+    "backgroundAudio": {
+      "flag": false,
+      "observation": "none"
+    },
+    "speechContent": {
+      "flag": false,
+      "observation": "none"
+    }
+  },
+  "coaching": {
+    "eyeContact": 72,
+    "posture": 68,
+    "confidence": 70,
+    "delivery": 65,
+    "gestures": "natural",
+    "topStrength": "One specific thing they are doing well",
+    "topImprovement": "One concrete, actionable thing to fix RIGHT NOW"
+  }
 }
 
-Scoring (0-100): 70 = average, 85+ = strong, 50- = needs work
-eyeContact: Are they looking at camera? Eyes straight ahead = high. Looking down/sideways repeatedly = low.
-posture: Upright and professional? Slouching, leaning too far back = low.
-confidence: Overall presence. Relaxed but engaged = high. Visible tension, fidgeting = low.
-gestures: "minimal" (stiff), "natural" (appropriate), "excessive" (distracting)
-verdict: One concrete coaching note about what to improve RIGHT NOW.
-cheatSignal: "none" | "reading" (eyes scanning left-right like reading) | "offscreen" (repeatedly looking at another screen/notes) | "distracted"
-
-Be calibrated and honest. Return valid JSON only.`;
+overallRisk: "low" | "medium" | "high"
+Be calibrated. A single offscreen glance is not a flag. Only flag patterns that are repeated, rhythmic, or structurally suspicious.`;
 
   try {
     const resp = await callGeminiVision(base64Image, prompt);
@@ -251,7 +283,7 @@ Be calibrated and honest. Return valid JSON only.`;
 
 /* ── End-of-interview report ── */
 async function getGeminiEndReport() {
-  if (!S.apiKey || S.qHistory.length === 0) return null;
+  if (!getApiKey() || S.qHistory.length === 0) return null;
 
   const convo = S.qHistory.map((q, i) =>
     `Q${i + 1}: ${q.q}\nAnswer: ${q.answer || '(no answer given)'}`
@@ -314,45 +346,33 @@ Make feedback specific to what they actually said. No generic platitudes.`;
   return null;
 }
 
-/* ── Adaptive follow-up analysis ── */
+/* ── Adaptive follow-up: ask Gemini to find the gap ── */
 async function analyzeForFollowUp(answer, question) {
-  if (!answer || answer.trim().split(/\s+/).length < 5) return;
+  if (!getApiKey() || !answer || answer.trim().split(/\s+/).length < 8) return;
 
-  // Pattern: ownership avoidance — "we" without "I"
-  const weCount = (answer.match(/\bwe\b|\bour team\b|\bour group\b/gi) || []).length;
-  const iCount  = (answer.match(/\bI\b/g) || []).length;
-  if (weCount >= 2 && iCount === 0) {
-    S.followUpQueue.unshift(
-      "I need specifics — walk me through exactly what YOU personally did on that, not the team."
-    );
-    return;
-  }
+  const prompt = `You are an expert interviewer evaluating a candidate's answer.
 
-  // Pattern: vague quantifiers
-  const vagueMatches = answer.match(/\b(some|various|multiple|many|a lot|several|different)\b/gi) || [];
-  if (vagueMatches.length >= 3) {
-    S.followUpQueue.unshift(
-      "You're being very vague. Give me actual numbers — how many, what timeline, what was the measurable impact?"
-    );
-    return;
-  }
+Question asked: "${question}"
+Candidate's answer: "${answer}"
 
-  // Pattern: strong claim worth drilling
-  const claimMatch = answer.match(/\b(led|architected|built|designed|scaled|optimized|launched|owned)\b/i);
-  if (claimMatch) {
-    const verb = claimMatch[0].toLowerCase();
-    S.followUpQueue.unshift(
-      `You said you ${verb} something. Walk me through the exact technical decisions you personally made — what alternatives did you consider, and why did you choose what you did?`
-    );
-    return;
-  }
+Identify the single most important gap, vague claim, shallow explanation, or opportunity for deeper probing in this answer. Generate ONE specific follow-up question that directly addresses it.
 
-  // Pattern: very short answer
-  const wordCount = answer.trim().split(/\s+/).length;
-  if (wordCount < 30) {
-    S.followUpQueue.unshift(
-      "That's too brief. Expand on that — I need to understand the full context, your thought process, and the actual outcome."
-    );
+Prioritize in this order:
+1. If they mentioned a specific technology or algorithm but didn't explain HOW it works — ask for the mechanism
+2. If they made a quantitative claim (accuracy, speed, scale) without context — probe baseline and measurement
+3. If they said "we" throughout without specifying their personal contribution — ask what THEY did
+4. If they made an architectural or technical decision without explaining WHY — probe the reasoning and alternatives
+5. If the answer is vague or high-level without concrete specifics — ask for the actual details
+
+Return ONLY the follow-up question. No preamble, no explanation, no "Here is my follow-up:". Just the question itself.`;
+
+  const result = await callGemini(
+    [{ role: 'user', parts: [{ text: prompt }] }],
+    '', { maxTokens: 120, temp: 0.7 }
+  );
+
+  if (result && result.trim().length > 10) {
+    S.followUpQueue.unshift(result.trim());
   }
 }
 

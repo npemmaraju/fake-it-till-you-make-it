@@ -47,7 +47,7 @@ function stopBodyLanguageAnalysis() {
 async function runBodyLanguageCapture() {
   S.bodyLang.nextScanIn = BL_INTERVAL_MS / 1000;
 
-  if (!S.apiKey) {
+  if (!getApiKey()) {
     renderBLNoKey();
     return;
   }
@@ -91,9 +91,9 @@ async function runBodyLanguageCapture() {
 
     renderBLPanel(result);
 
-    // Feed cheat signal to cheat detector
-    if (result.cheatSignal && result.cheatSignal !== 'none') {
-      processVideoCheatSignal(result.cheatSignal, S.currentQ);
+    // Feed cheat detection object to cheat detector
+    if (result.cheatDetection) {
+      processVideoCheatSignal(result.cheatDetection, S.currentQ);
     }
   } else {
     // Analysis failed — show last reading or placeholder
@@ -121,26 +121,38 @@ function renderBLPanel(result) {
   const body = document.getElementById('blp-body');
   if (!body) return;
 
-  const eyeCls = scoreToClass(result.eyeContact);
-  const posCls = scoreToClass(result.posture);
-  const conCls = scoreToClass(result.confidence);
+  // Support both new structure (result.coaching.*) and legacy flat structure
+  const c = result.coaching || result;
+  const cd = result.cheatDetection;
+
+  const eyeCls = scoreToClass(c.eyeContact);
+  const posCls = scoreToClass(c.posture);
+  const conCls = scoreToClass(c.confidence);
+  const delCls = scoreToClass(c.delivery);
+
+  const riskBadge = cd ? `<span class="cheat-risk-badge risk-${cd.overallRisk}">${cd.overallRisk.toUpperCase()} RISK</span>` : '';
 
   body.innerHTML = `
     <div class="blp-metrics">
-      ${blpMetric('Eye Contact', result.eyeContact, eyeCls)}
-      ${blpMetric('Posture', result.posture, posCls)}
-      ${blpMetric('Confidence', result.confidence, conCls)}
+      ${blpMetric('Eye Contact', c.eyeContact, eyeCls)}
+      ${blpMetric('Posture', c.posture, posCls)}
+      ${blpMetric('Confidence', c.confidence, conCls)}
+      ${c.delivery != null ? blpMetric('Delivery', c.delivery, delCls) : ''}
       <div class="blp-metric-row">
         <div class="blp-metric-header">
           <span class="blp-metric-name">Gestures</span>
-          <span class="blp-gesture-tag ${result.gestures || 'natural'}">${capitalize(result.gestures || 'natural')}</span>
+          <span class="blp-gesture-tag ${c.gestures || 'natural'}">${capitalize(c.gestures || 'natural')}</span>
         </div>
       </div>
     </div>
     <div class="blp-verdict">
-      <div class="blp-verdict-label">Coach Note</div>
-      ${escapeHtml(result.verdict || 'No notes yet.')}
+      <div class="blp-verdict-label">Strength ${riskBadge}</div>
+      ${escapeHtml(c.topStrength || c.verdict || 'No notes yet.')}
     </div>
+    ${c.topImprovement ? `<div class="blp-verdict" style="margin-top:6px">
+      <div class="blp-verdict-label">Fix Now</div>
+      ${escapeHtml(c.topImprovement)}
+    </div>` : ''}
     <div id="cheat-flags-section">
       ${renderCheatFlagsInline()}
     </div>`;
@@ -226,11 +238,14 @@ function getBodyLangSummary() {
   const readings = S.bodyLang.readings;
   if (readings.length === 0) return null;
 
+  const get = (r, field) => (r.coaching || r)[field] || 0;
+
   return {
-    eyeContact: Math.round(readings.reduce((a, b) => a + b.eyeContact, 0) / readings.length),
-    posture: Math.round(readings.reduce((a, b) => a + b.posture, 0) / readings.length),
-    confidence: Math.round(readings.reduce((a, b) => a + b.confidence, 0) / readings.length),
+    eyeContact: Math.round(readings.reduce((a, r) => a + get(r, 'eyeContact'), 0) / readings.length),
+    posture: Math.round(readings.reduce((a, r) => a + get(r, 'posture'), 0) / readings.length),
+    confidence: Math.round(readings.reduce((a, r) => a + get(r, 'confidence'), 0) / readings.length),
+    delivery: Math.round(readings.reduce((a, r) => a + get(r, 'delivery'), 0) / readings.length),
     readingCount: readings.length,
-    verdicts: readings.map(r => r.verdict).filter(Boolean)
+    verdicts: readings.map(r => (r.coaching?.topImprovement || r.verdict)).filter(Boolean)
   };
 }
